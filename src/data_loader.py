@@ -14,7 +14,7 @@ class AnimeDataLoader:
 
         missing = required_cols - set(df.columns)
         if missing:
-            raise ValueError("Missing column  in CSV File")
+            raise ValueError("Missing columnsin CSV File")
 
         df['combined_info'] = (
             "Title: " + df["Name"] + " Overview: " +
