@@ -1,5 +1,5 @@
 ## Parent image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 ## Essential environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,17 +8,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 ## Work directory inside the docker container
 WORKDIR /app
 
-## Installing system dependancies
+## Installing system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-## Copying ur all contents from local to app
+## Copying your all contents from local to app
 COPY . .
 
 ## Run setup.py
-RUN pip install --no-cache-dir -e .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -e .
 
 # Used PORTS
 EXPOSE 8501
