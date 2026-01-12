@@ -37,7 +37,7 @@
   ```bash
   git clone https://github.com/PranavAthanimath/production-rag-anime-recommender.git
   ls
-  cd TESTING-9
+  cd production-rag-anime-recommender
   ls  # You should see the contents of your project
   ```
 
@@ -152,33 +152,46 @@ git push origin main
 ## Point Docker to Minikube
 eval $(minikube docker-env)
 
-docker build -t llmops-app:latest .
+## Build the Docker image (use the name matching llmops-k8s.yaml)
+docker build -t anime-recommender:v1.0 .
 
-kubectl create secret generic llmops-secrets \
-  --from-literal=GROQ_API_KEY="" \
-  --from-literal=HUGGINGFACEHUB_API_TOKEN=""
+## Create Kubernetes secret for API keys (name must match llmops-k8s.yaml: anime-secrets)
+kubectl create secret generic anime-secrets \
+  --from-literal=GROQ_API_KEY="your-groq-api-key-here"
 
+## Deploy to Kubernetes
 kubectl apply -f llmops-k8s.yaml
 
+## Check pod status (wait until READY shows 1/1)
+kubectl get pods -w
+# Press Ctrl+C when you see "1/1 Running"
 
+## IMPORTANT: Wait 2-3 minutes for the pipeline to fully initialize
+## (ChromaDB + HuggingFace embeddings need time to load)
+
+## Open another terminal for port-forward
+kubectl port-forward svc/anime-recommender-service 8501:80 --address 0.0.0.0
+
+## Now access the app at: http://<VM-EXTERNAL-IP>:8501
+```
+
+#### Troubleshooting
+
+If you see "Connection error" in the browser:
+
+```bash
+# Check pod status
 kubectl get pods
 
-### U will see pods runiing
+# If pod shows OOMKilled or CrashLoopBackOff:
+kubectl describe pod <pod-name>
+# Look for "OOMKilled" in "Last State" section
+# Solution: Increase memory in llmops-k8s.yaml to 2Gi (already done in this repo)
 
-
-# Do minikube tunnel on one terminal
-
-minikube tunnel
-
-
-# Open another terminal
-
-kubectl port-forward svc/llmops-service 8501:80 --address 0.0.0.0
-
-## Now copy external ip and :8501 and see ur app there....
-
-
+# Check logs for errors
+kubectl logs <pod-name>
 ```
+
 
 ### 6. GRAFANA CLOUD MONITORING
 
