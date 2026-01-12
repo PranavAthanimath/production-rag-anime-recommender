@@ -1,39 +1,104 @@
+# Kubernetes Deployment for Anime Recommender System
+# This configuration deploys the Streamlit app with best practices for learning environments
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: llmops-app
+  name: anime-recommender-deployment
   labels:
-    app: llmops
+    app: anime-recommender
+    tier: frontend
+    environment: learning
 spec:
+  # Number of pod replicas (1 is fine for learning/demo)
   replicas: 1
+  
+  # Selector to identify which pods belong to this deployment
   selector:
     matchLabels:
-      app: llmops
+      app: anime-recommender
+  
+  # Template for creating pods
   template:
     metadata:
       labels:
-        app: llmops
+        app: anime-recommender
     spec:
       containers:
-      - name: llmops-container
-        image: llmops-app:latest  # Use local image
-        imagePullPolicy: IfNotPresent
+      - name: streamlit-app
+        # Image built from Dockerfile (build locally with: docker build -t anime-recommender:v1.0 .)
+        image: anime-recommender:v1.0
+        imagePullPolicy: IfNotPresent  # Use local image, don't pull from registry
+        
         ports:
-          - containerPort: 8501
+          - name: http
+            containerPort: 8501
+            protocol: TCP
+        
+        # Resource limits (prevents the pod from consuming too much CPU/memory)
+        resources:
+          requests:
+            memory: "256Mi"  # Minimum memory guaranteed
+            cpu: "250m"      # Minimum CPU (0.25 cores)
+          limits:
+            memory: "512Mi"  # Maximum memory allowed
+            cpu: "500m"      # Maximum CPU (0.5 cores)
+        
+        # Health checks to ensure the app is running properly
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health  # Streamlit's built-in health endpoint
+            port: 8501
+          initialDelaySeconds: 30  # Wait 30s after startup before checking
+          periodSeconds: 10        # Check every 10 seconds
+          timeoutSeconds: 5
+          failureThreshold: 3      # Restart pod after 3 failed checks
+        
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+        
+        # Environment variables from Kubernetes Secret
+        # Create secret with: kubectl create secret generic anime-secrets --from-literal=GROQ_API_KEY=your-key-here
         envFrom:
           - secretRef:
-              name: llmops-secrets 
+              name: anime-secrets
 
 ---
+# Service: Exposes the deployment to external traffic
 apiVersion: v1
 kind: Service
 metadata:
-  name: llmops-service
+  name: anime-recommender-service
+  labels:
+    app: anime-recommender
 spec:
-  type: LoadBalancer
+  # For local testing (Minikube/Kind), use NodePort
+  # For cloud deployment (AWS/GCP/Azure), use LoadBalancer
+  type: NodePort
   selector:
-    app: llmops
+    app: anime-recommender
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 8501
+      port: 80          # External port
+      targetPort: 8501  # Container port (Streamlit)
+      nodePort: 30080   # Access the app at http://<node-ip>:30080
+
+# Alternative LoadBalancer service (comment out NodePort and uncomment this for cloud)
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: anime-recommender-lb
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app: anime-recommender
+#   ports:
+#     - protocol: TCP
+#       port: 80
+#       targetPort: 8501
